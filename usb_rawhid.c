@@ -49,7 +49,7 @@
 // all, but allocating more than necessary means reserved
 // bandwidth is no longer available to other USB devices.
 #define RAWHID_TX_SIZE		7	// transmit packet size  //CHANGED to suit Joystick
-#define RAWHID_TX_INTERVAL	2	// max # of ms between transmit packets
+#define RAWHID_TX_INTERVAL	10	// max # of ms between transmit packets //CHANGED to match joystick
 //Receive is currently unused by the joystick, but may be used for force feedback
 #define RAWHID_RX_SIZE		64	// receive packet size
 #define RAWHID_RX_INTERVAL	8	// max # of ms between receive packets
@@ -140,9 +140,9 @@ static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
 	1,					// bNumInterfaces
 	1,					// bConfigurationValue
 	0,					// iConfiguration
-	0xC0,					// bmAttributes
-	50,					// bMaxPower
-
+	0xC0,				// bmAttributes  //Joytick is 0x80 (not self powered, no remote
+															 //wakeup, but leave as is for Teensy hadware
+	50,					// bMaxPower		//Joystick is 40, but leave as is for Teensy hardware
 	// interface descriptor, USB spec 9.6.5, page 267-269, Table 9-12
 	9,					// bLength
 	4,					// bDescriptorType
@@ -150,9 +150,11 @@ static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
 	0,					// bAlternateSetting
 	2,					// bNumEndpoints
 	0x03,					// bInterfaceClass (0x03 = HID)
-	0x00,					// bInterfaceSubClass (0x01 = Boot)
-	0x00,					// bInterfaceProtocol (0x01 = Keyboard)
+	0x00,					// bInterfaceSubClass 				//NOTE joystick doesn't use suu class
+	0x00,					// bInterfaceProtocol  				//NOTE joystick doesn't use sub protocol
 	0,					// iInterface
+	//NOTE: HID descriptors are slightly different, but these differences don't affect the
+	//the basic functionality
 	// HID interface descriptor, HID 1.11 spec, section 6.2.1
 	9,					// bLength
 	0x21,					// bDescriptorType
@@ -166,7 +168,7 @@ static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
 	7,					// bLength
 	5,					// bDescriptorType
 	RAWHID_TX_ENDPOINT | 0x80,		// bEndpointAddress
-	0x03,					// bmAttributes (0x03=intr)
+		0x03,					// bmAttributes (0x03=intr)
 	RAWHID_TX_SIZE, 0,			// wMaxPacketSize
 	RAWHID_TX_INTERVAL,			// bInterval
 	// endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
