@@ -31,7 +31,8 @@
 #define CPU_PRESCALE(n)	(CLKPR = 0x80, CLKPR = (n))
 
 volatile uint8_t do_output=0;
-uint8_t buffer[64];
+uint8_t buffer[7];
+uint8_t buffer_last[sizeof(buffer)];
 
 int main(void)
 {
@@ -40,6 +41,7 @@ int main(void)
 	uint16_t val, count=0;
 	uint8_t offset;
 	uint8_t buffVal;
+	uint8_t buffChanged = 0;
 
 	//Analog input map
 	#define ROLL 0
@@ -83,6 +85,12 @@ int main(void)
   TCCR0B = 0x05;
   TIMSK0 = (1<<TOIE0);
 
+	//Initialize buffers to 0
+	for (i=0; i<sizeof(buffer); i++) {
+		buffer[i]=0;
+		buffer_last[i]=0;
+	}
+
 	while (1) {
 		// if time to send output, transmit something interesting
 		if (do_output) {
@@ -110,20 +118,37 @@ int main(void)
 			//Dummy value
 			buffer[6] = dummyValue;
 
-			//initiate HID send
-			usb_rawhid_send(buffer, 50);
-		}
-	}
+			//Detect changes in buffer values,
+			//then update the buffer's last values
+			buffChanged = 0;
+			for (i=0; i<sizeof(buffer); i++) {
+				if (buffer[i] != buffer_last[i]){
+					buffChanged = 1;
+				}
+				buffer_last[i] = buffer[i];
+			}
+
+			//if a change in the buffer value occured, send the HID packet
+			if (buffChanged) {
+				usb_rawhid_send(buffer, 50);
+			}
+		} //End do_output
+	} //End while(1)
 }
 
 // This interrupt routine is run approx 61 times per second.
 ISR(TIMER0_OVF_vect)
 {
-	static uint8_t count=0;
+
+	/*static uint8_t count=0;
 
 	// set the do_output variable every 2 seconds
 	if (++count > 122) {
 		count = 0;
 		do_output = 1;
 	}
+	*/
+
+	// set the do_output varirable to trigger every interrupt
+	do_output = 1;
 }

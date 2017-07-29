@@ -112,6 +112,7 @@ static const uint8_t PROGMEM device_descriptor[] = {
 	1						// bNumConfigurations
 };
 
+/*/
 static const uint8_t PROGMEM rawhid_hid_report_desc[] = {
 	0x06, LSB(RAWHID_USAGE_PAGE), MSB(RAWHID_USAGE_PAGE),
 	0x0A, LSB(RAWHID_USAGE), MSB(RAWHID_USAGE),
@@ -127,7 +128,20 @@ static const uint8_t PROGMEM rawhid_hid_report_desc[] = {
 	0x91, 0x02,				// Output (array)
 	0xC0					// end collection
 };
+*/
 
+//Modified version which exactly matches the Report descriptor
+static const uint8_t PROGMEM rawhid_hid_report_desc[] = {
+																																							0x05, 0x01, 0x09, 0x04,
+	0xa1, 0x01, 0xa1, 0x02, 0x09, 0x01, 0xa1, 0x00,			0x75, 0x08, 0x95, 0x02, 0x15, 0x00, 0x26, 0xff,
+	0x00, 0x35, 0x00, 0x46, 0xff, 0x00, 0x09, 0x30, 		0x09, 0x31, 0x81, 0x02, 0x06, 0x00, 0xff, 0x09,
+	0x01, 0x75, 0x04, 0x95, 0x01, 0x25, 0x0f, 0x81, 		0x02, 0x05, 0x01, 0x25, 0x07, 0x46, 0x3b, 0x01,
+	0x65, 0x14, 0x09, 0x39, 0x81, 0x42, 0x75, 0x08,     0x26, 0xff, 0x00, 0x46, 0xff, 0x00, 0x09, 0x35,
+	0x81, 0x02, 0xc0, 0x65, 0x00, 0x75, 0x01, 0x95,			0x07, 0x25, 0x01, 0x45, 0x01, 0x05, 0x09, 0x19,
+	0x01, 0x29, 0x07, 0x81, 0x02, 0x95, 0x01, 0x81, 		0x01, 0x05, 0x01, 0x75, 0x08, 0x26, 0xff, 0x00,
+	0x46, 0xff, 0x00, 0x09, 0x36, 0x81, 0x02, 0x06, 		0x00, 0xff, 0x09, 0x01, 0x95, 0x01, 0x81, 0x02,
+	0xc0, 0xa1, 0x02, 0x06, 0x00, 0xff, 0x09, 0x02, 		0x95, 0x08, 0x91, 0x02, 0xc0, 0xc0
+};
 
 #define CONFIG1_DESC_SIZE        (9+9+9+7+7)
 #define RAWHID_HID_DESC_OFFSET   (9+9)
@@ -150,20 +164,18 @@ static const uint8_t PROGMEM config1_descriptor[CONFIG1_DESC_SIZE] = {
 	0,					// bAlternateSetting
 	2,					// bNumEndpoints
 	0x03,					// bInterfaceClass (0x03 = HID)
-	0x00,					// bInterfaceSubClass 				//NOTE joystick doesn't use suu class
+	0x00,					// bInterfaceSubClass 				//NOTE joystick doesn't use sub class
 	0x00,					// bInterfaceProtocol  				//NOTE joystick doesn't use sub protocol
 	0,					// iInterface
-	//NOTE: HID descriptors are slightly different, but these differences don't affect the
-	//the basic functionality
+	//HID Descriptor modified to exactly match joystick
 	// HID interface descriptor, HID 1.11 spec, section 6.2.1
 	9,					// bLength
 	0x21,					// bDescriptorType
-	0x11, 0x01,				// bcdHID
+	0x00, 0x01,				// bcdHID
 	0,					// bCountryCode
 	1,					// bNumDescriptors
 	0x22,					// bDescriptorType
-	sizeof(rawhid_hid_report_desc),		// wDescriptorLength
-	0,
+	sizeof(rawhid_hid_report_desc),	0,	// wDescriptorLength
 	// endpoint descriptor, USB spec 9.6.6, page 269-271, Table 9-13
 	7,					// bLength
 	5,					// bDescriptorType
@@ -245,18 +257,17 @@ static volatile uint8_t tx_timeout_count=0;
  *
  **************************************************************************/
 
-
 // initialize USB
 void usb_init(void)
 {
 	HW_CONFIG();
 	USB_FREEZE();				// enable USB
 	PLL_CONFIG();				// config PLL
-        while (!(PLLCSR & (1<<PLOCK))) ;	// wait for PLL lock
-        USB_CONFIG();				// start USB clock
-        UDCON = 0;				// enable attach resistor
+  while (!(PLLCSR & (1<<PLOCK))) ;	// wait for PLL lock
+  USB_CONFIG();				// start USB clock
+	UDCON = 0;				// enable attach resistor
 	usb_configuration = 0;
-        UDIEN = (1<<EORSTE)|(1<<SOFE);
+  UDIEN = (1<<EORSTE)|(1<<SOFE);
 	sei();
 }
 
@@ -266,7 +277,6 @@ uint8_t usb_configured(void)
 {
 	return usb_configuration;
 }
-
 
 // receive a packet, with timeout
 int8_t usb_rawhid_recv(uint8_t *buffer, uint8_t timeout)
@@ -332,20 +342,15 @@ int8_t usb_rawhid_send(const uint8_t *buffer, uint8_t timeout)
 	return RAWHID_TX_SIZE;
 }
 
-
-
-
 /**************************************************************************
  *
  *  Private Functions - not intended for general user consumption....
  *
  **************************************************************************/
 
-
 #if (GCC_VERSION >= 40300) && (GCC_VERSION < 40302)
 #error "Buggy GCC 4.3.0 compiler, please upgrade!"
 #endif
-
 
 // USB Device Interrupt - handle all device-level events
 // the transmit buffer flushing is triggered by the start of frame
@@ -354,15 +359,15 @@ ISR(USB_GEN_vect)
 {
 	uint8_t intbits, t;
 
-        intbits = UDINT;
-        UDINT = 0;
-        if (intbits & (1<<EORSTI)) {
-		UENUM = 0;
-		UECONX = 1;
-		UECFG0X = EP_TYPE_CONTROL;
-		UECFG1X = EP_SIZE(ENDPOINT0_SIZE) | EP_SINGLE_BUFFER;
-		UEIENX = (1<<RXSTPE);
-		usb_configuration = 0;
+  intbits = UDINT;
+  UDINT = 0;
+  if (intbits & (1<<EORSTI)) {
+	UENUM = 0;
+	UECONX = 1;
+	UECFG0X = EP_TYPE_CONTROL;
+	UECFG1X = EP_SIZE(ENDPOINT0_SIZE) | EP_SINGLE_BUFFER;
+	UEIENX = (1<<RXSTPE);
+	usb_configuration = 0;
         }
 	if ((intbits & (1<<SOFI)) && usb_configuration) {
 		t = rx_timeout_count;
@@ -371,8 +376,6 @@ ISR(USB_GEN_vect)
 		if (t) tx_timeout_count = --t;
 	}
 }
-
-
 
 // Misc functions to wait for ready and send/receive packets
 static inline void usb_wait_in_ready(void)
@@ -392,17 +395,15 @@ static inline void usb_ack_out(void)
 	UEINTX = ~(1<<RXOUTI);
 }
 
-
-
 // USB Endpoint Interrupt - endpoint 0 is handled here.  The
 // other endpoints are manipulated by the user-callable
 // functions, and the start-of-frame interrupt.
 //
 ISR(USB_COM_vect)
 {
-        uint8_t intbits;
+  uint8_t intbits;
 	const uint8_t *list;
-        const uint8_t *cfg;
+  const uint8_t *cfg;
 	uint8_t i, n, len, en;
 	uint8_t bmRequestType;
 	uint8_t bRequest;
@@ -416,16 +417,16 @@ ISR(USB_COM_vect)
   UENUM = 0;
 	intbits = UEINTX;
   if (intbits & (1<<RXSTPI)) {
-          bmRequestType = UEDATX;
-          bRequest = UEDATX;
-          wValue = UEDATX;
-          wValue |= (UEDATX << 8);
-          wIndex = UEDATX;
-          wIndex |= (UEDATX << 8);
-          wLength = UEDATX;
-          wLength |= (UEDATX << 8);
-          UEINTX = ~((1<<RXSTPI) | (1<<RXOUTI) | (1<<TXINI));
-    if (bRequest == GET_DESCRIPTOR) {
+    bmRequestType = UEDATX;
+    bRequest = UEDATX;
+    wValue = UEDATX;
+    wValue |= (UEDATX << 8);
+    wIndex = UEDATX;
+    wIndex |= (UEDATX << 8);
+    wLength = UEDATX;
+    wLength |= (UEDATX << 8);
+    UEINTX = ~((1<<RXSTPI) | (1<<RXOUTI) | (1<<TXINI));
+  	if (bRequest == GET_DESCRIPTOR) {
 			list = (const uint8_t *)descriptor_list;
 			for (i=0; ; i++) {
 				if (i >= NUM_DESC_LIST) {
@@ -466,7 +467,7 @@ ISR(USB_COM_vect)
 				usb_send_in();
 			} while (len || n == ENDPOINT0_SIZE);
 			return;
-                }
+    }
 		if (bRequest == SET_ADDRESS) {
 			usb_send_in();
 			usb_wait_in_ready();
@@ -496,7 +497,6 @@ ISR(USB_COM_vect)
 			usb_send_in();
 			return;
 		}
-
 		if (bRequest == GET_STATUS) {
 			usb_wait_in_ready();
 			i = 0;
