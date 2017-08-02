@@ -60,11 +60,8 @@ int main(void)
   uint8_t analogValues[analogCount];
 
 	//Digital Inputs:
-	uint8_t view_switch;
+	uint8_t view_switch; //TODO implement view switch
 	uint8_t buttons;
-
-	//Dummy value which isn't excercized by normal functionality (maybe error byte?)
-	const uint8_t dummyValue = 3;
 
 	// set for 16 MHz clock
 	CPU_PRESCALE(0);
@@ -90,6 +87,8 @@ int main(void)
 		buffer[i]=0;
 		buffer_last[i]=0;
 	}
+	//Dummy value which isn't excercized by normal functionality (maybe status byte?)
+	buffer[6] = 3;
 
 	while (1) {
 		// if time to send output, transmit something interesting
@@ -102,21 +101,12 @@ int main(void)
 			buttons = ~PIND & 0x7f; //1)Active low, so invert, 2) mask out bit 7
 			buffer[4] = buttons;
 
-			//Read view_switch inputs from PORTB
-			DDRB = 0x00;
-			PORTB = 0xFF;
-			view_switch = ~PINB & 0x7f; //1)Active low, so invert, 2) mask out bit 7
-			buffer[2] = view_switch;
-
-			//Read analog values
-			for (i=0; i<analogCount; i++) {
-			 	offset = analogMap[i];
-				val = analogRead(offset);
-				buffer[offset] = val >> 2;
-			}
-
-			//Dummy value
-			buffer[6] = dummyValue;
+			//Read analog values									//Analog Map (location in the packet)
+			for (i=0; i<analogCount; i++) {			  //  i : offset
+			 	offset = analogMap[i]; 							//  0 -> 1
+				val = analogRead(offset);						//  1 -> 1
+				buffer[offset] = val >> 2;          //  2 -> 3
+			}																			//  3 -> 5
 
 			//Detect changes in buffer values,
 			//then update the buffer's last values
@@ -139,16 +129,6 @@ int main(void)
 // This interrupt routine is run approx 61 times per second.
 ISR(TIMER0_OVF_vect)
 {
-
-	/*static uint8_t count=0;
-
-	// set the do_output variable every 2 seconds
-	if (++count > 122) {
-		count = 0;
-		do_output = 1;
-	}
-	*/
-
 	// set the do_output varirable to trigger every interrupt
 	do_output = 1;
 }

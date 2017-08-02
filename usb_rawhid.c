@@ -112,24 +112,6 @@ static const uint8_t PROGMEM device_descriptor[] = {
 	1						// bNumConfigurations
 };
 
-/*/
-static const uint8_t PROGMEM rawhid_hid_report_desc[] = {
-	0x06, LSB(RAWHID_USAGE_PAGE), MSB(RAWHID_USAGE_PAGE),
-	0x0A, LSB(RAWHID_USAGE), MSB(RAWHID_USAGE),
-	0xA1, 0x01,				// Collection 0x01
-	0x75, 0x08,				// report size = 8 bits
-	0x15, 0x00,				// logical minimum = 0
-	0x26, 0xFF, 0x00,			// logical maximum = 255
-	0x95, RAWHID_TX_SIZE,			// report count
-	0x09, 0x01,				// usage
-	0x81, 0x02,				// Input (array)
-	0x95, RAWHID_RX_SIZE,			// report count
-	0x09, 0x02,				// usage
-	0x91, 0x02,				// Output (array)
-	0xC0					// end collection
-};
-*/
-
 //Modified version which exactly matches the Report descriptor
 static const uint8_t PROGMEM rawhid_hid_report_desc[] = {
 																																							0x05, 0x01, 0x09, 0x04,
@@ -234,7 +216,6 @@ static const struct descriptor_list_struct {
 };
 #define NUM_DESC_LIST (sizeof(descriptor_list)/sizeof(struct descriptor_list_struct))
 
-
 /**************************************************************************
  *
  *  Variables - these are the only non-stack RAM usage
@@ -315,29 +296,36 @@ int8_t usb_rawhid_send(const uint8_t *buffer, uint8_t timeout)
 {
 	uint8_t intr_state;
 	uint8_t offset;
-
-	// if we're not online (enumerated and configured), error
+	//Make we are in a Configured device state
 	if (!usb_configuration) return -1;
+	// Save global interrupt state, then disable interrupts
 	intr_state = SREG;
 	cli();
+	//Inialize timeout (counted in the ISR() interrupt handler)
 	tx_timeout_count = timeout;
-	UENUM = RAWHID_TX_ENDPOINT;
-	// wait for the FIFO to be ready to accept data
+	//===Wait for the FIFO to be ready to accept data===:
 	while (1) {
-		if (UEINTX & (1<<RWAL)) break;
+		//Select the endpoint, check if the buffer is ready, and break if it is
+		UENUM = RAWHID_TX_ENDPOINT;
+		if (UEINTX & (1<<RWAL))
+			break;
+		//Restore interrupts
 		SREG = intr_state;
+		//Exit if we reach the timeout or if the device becomes unconfigured
 		if (tx_timeout_count == 0) return 0;
 		if (!usb_configuration) return -1;
+		// Save and clear interrupts
 		intr_state = SREG;
 		cli();
-		UENUM = RAWHID_TX_ENDPOINT;
 	}
 	// write bytes to the FIFO buffer
 	for (offset=0; offset<RAWHID_TX_SIZE; offset++){
 			UEDATX = *buffer++;
 	}
-	// transmit it now
+	// Transmit the buffer
+	UENUM = RAWHID_TX_ENDPOINT;
 	UEINTX = 0x3A;
+	// Restore interrupts
 	SREG = intr_state;
 	return RAWHID_TX_SIZE;
 }
@@ -362,13 +350,13 @@ ISR(USB_GEN_vect)
   intbits = UDINT;
   UDINT = 0;
   if (intbits & (1<<EORSTI)) {
-	UENUM = 0;
-	UECONX = 1;
-	UECFG0X = EP_TYPE_CONTROL;
-	UECFG1X = EP_SIZE(ENDPOINT0_SIZE) | EP_SINGLE_BUFFER;
-	UEIENX = (1<<RXSTPE);
-	usb_configuration = 0;
-        }
+		UENUM = 0;
+		UECONX = 1;
+		UECFG0X = EP_TYPE_CONTROL;
+		UECFG1X = EP_SIZE(ENDPOINT0_SIZE) | EP_SINGLE_BUFFER;
+		UEIENX = (1<<RXSTPE);
+		usb_configuration = 0;
+  }
 	if ((intbits & (1<<SOFI)) && usb_configuration) {
 		t = rx_timeout_count;
 		if (t) rx_timeout_count = --t;
