@@ -41,7 +41,7 @@
 
 
 # Target file name (without extension).
-TARGET = example
+TARGET = joystick
 
 
 # List C source files here. (C dependencies are automatically generated.)
